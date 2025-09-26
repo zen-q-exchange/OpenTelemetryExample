@@ -10,6 +10,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Exporter;
+using OpenTelemetry;
 
 namespace CFX.OpenTelemetry
 {
@@ -65,13 +66,17 @@ namespace CFX.OpenTelemetry
             return string.Join(".", chunks.AsEnumerable().Skip(1));
         }
 
-        public static IServiceCollection AddApplicationOpenTelemetry(this IServiceCollection services, IConfiguration configuration, Action<MeterProviderBuilder>? configureMeterProviderAction = null)
+        public static IServiceCollection AddApplicationOpenTelemetry(this IServiceCollection services,
+                                                                     IConfiguration configuration,
+                                                                     bool explicitLoggingRegistration = false,
+                                                                     Action<MeterProviderBuilder>? configureMeterProviderAction = null)
         {
             ArgumentNullException.ThrowIfNull(configuration, nameof(configuration));
             OpenTelemetrySettings options = GetOpenTelemetrySettings(configuration);
 
             bool instrumentHttpClient = options.Instrumentation.HttpClientEnabled;
             bool instrumentAspNetCore = options.Instrumentation.AspNetCoreEnabled;
+            bool instrumentRedis = options.Instrumentation.RedisEnabled;
 
             AssemblyName? assemblyName = Assembly.GetEntryAssembly()?.GetName();
 
@@ -82,15 +87,15 @@ namespace CFX.OpenTelemetry
 
             services.Configure<OpenTelemetrySettings>(configuration.GetSection(OpenTelemetrySettingsKey));
 
-            services.AddOpenTelemetry()
-                    .ConfigureResource(resourceBuilder =>
+            OpenTelemetryBuilder builder = services.AddOpenTelemetry();
+            builder.ConfigureResource(resourceBuilder =>
                     {
                         resourceBuilder.AddService(serviceName: applicationName!,
                                                    serviceNamespace: applicationNamespace,
                                                    serviceVersion: version,
                                                    serviceInstanceId: Environment.MachineName);
                     })
-                    .WithTracing(builder =>
+                   .WithTracing(builder =>
                     {
                         builder = builder.ConfigureResource((resourceBuilder) =>
                                                             {
@@ -111,6 +116,10 @@ namespace CFX.OpenTelemetry
                         {
                             builder.AddHttpClientInstrumentation();
                         }
+                        if (instrumentRedis)
+                        {
+                            builder.AddRedisInstrumentation();
+                        }
                         builder.AddNpgsql()
                                .AddEntityFrameworkCoreInstrumentation()
                                .AddOtlpExporter(opt =>
@@ -120,7 +129,7 @@ namespace CFX.OpenTelemetry
                                    opt.Protocol = OtlpExportProtocol.Grpc;
                                });
                     })
-                    .WithMetrics(builder =>
+                   .WithMetrics(builder =>
                     {
                         ResourceBuilder resourceBuilder = CreateResourceBuilder(options);
                         builder.SetResourceBuilder(resourceBuilder);
@@ -143,7 +152,6 @@ namespace CFX.OpenTelemetry
                         {
                             builder.AddHttpClientInstrumentation();
                         }
-
                         if (configureMeterProviderAction != null)
                         {
                             configureMeterProviderAction.Invoke(builder);
@@ -160,23 +168,26 @@ namespace CFX.OpenTelemetry
                                         {
                                             return instrument.GetType().GetGenericTypeDefinition() == typeof(Histogram<>) ? new Base2ExponentialBucketHistogramConfiguration() : null;
                                         });
-                    })
-                    .WithLogging(logging =>
-                    {
-                        logging.ConfigureResource((resourceBuilder) =>
-                        {
-                            resourceBuilder.AddService(serviceName: applicationName!,
-                                                       serviceNamespace: applicationNamespace,
-                                                       serviceVersion: version,
-                                                       serviceInstanceId: Environment.MachineName);
-                        })
-                        .AddOtlpExporter(opt =>
-                        {
-                            opt.Endpoint = new Uri(options.OtelExporterOtlpEndpoint!);
-                            opt.Headers = options.OtelExporterOtlpHeaders;
-                            opt.Protocol = OtlpExportProtocol.Grpc;
-                        });
                     });
+            if (explicitLoggingRegistration)
+            {
+                builder.WithLogging(logging =>
+                        {
+                            logging.ConfigureResource((resourceBuilder) =>
+                            {
+                                resourceBuilder.AddService(serviceName: applicationName!,
+                                                           serviceNamespace: applicationNamespace,
+                                                           serviceVersion: version,
+                                                           serviceInstanceId: Environment.MachineName);
+                            })
+                            .AddOtlpExporter(opt =>
+                            {
+                                opt.Endpoint = new Uri(options.OtelExporterOtlpEndpoint!);
+                                opt.Headers = options.OtelExporterOtlpHeaders;
+                                opt.Protocol = OtlpExportProtocol.Grpc;
+                            });
+                        });
+            }
 
             return services;
         }
