@@ -69,6 +69,7 @@ namespace CFX.OpenTelemetry
         public static IServiceCollection AddApplicationOpenTelemetry(this IServiceCollection services,
                                                                      IConfiguration configuration,
                                                                      bool explicitLoggingRegistration = false,
+                                                                     string? instanceIdKey = null,
                                                                      Action<MeterProviderBuilder>? configureMeterProviderAction = null)
         {
             ArgumentNullException.ThrowIfNull(configuration, nameof(configuration));
@@ -83,6 +84,7 @@ namespace CFX.OpenTelemetry
             string applicationName = options.OtelServiceName ?? throw new ArgumentNullException(nameof(options.OtelServiceName));
             string version = assemblyName?.Version?.ToString() ?? "unknown";
             string applicationNamespace = GetApplicationNamespace(applicationName);
+            string instanceId = GetInstanceId(configuration, instanceIdKey);
             Sampler? selectedSampler = GetSampler(configuration);
 
             services.Configure<OpenTelemetrySettings>(configuration.GetSection(OpenTelemetrySettingsKey));
@@ -93,7 +95,7 @@ namespace CFX.OpenTelemetry
                         resourceBuilder.AddService(serviceName: applicationName!,
                                                    serviceNamespace: applicationNamespace,
                                                    serviceVersion: version,
-                                                   serviceInstanceId: Environment.MachineName);
+                                                   serviceInstanceId: instanceId);
                     })
                    .WithTracing(builder =>
                     {
@@ -102,7 +104,8 @@ namespace CFX.OpenTelemetry
                                                                 resourceBuilder.AddService(serviceName: applicationName!,
                                                                                             serviceNamespace: applicationNamespace,
                                                                                             serviceVersion: version,
-                                                                                            serviceInstanceId: Environment.MachineName);
+                                                                                            serviceInstanceId: instanceId,
+                                                                                            autoGenerateServiceInstanceId: false);
                                                             });
                         if (selectedSampler != null)
                         {
@@ -138,7 +141,8 @@ namespace CFX.OpenTelemetry
                                                       resourceBuilder.AddService(serviceName: applicationName!,
                                                                                  serviceNamespace: applicationNamespace,
                                                                                  serviceVersion: version,
-                                                                                 serviceInstanceId: Environment.MachineName);
+                                                                                 serviceInstanceId: instanceId,
+                                                                                 autoGenerateServiceInstanceId: false);
                                                   });
 
                         builder.AddRuntimeInstrumentation()
@@ -178,7 +182,8 @@ namespace CFX.OpenTelemetry
                                 resourceBuilder.AddService(serviceName: applicationName!,
                                                            serviceNamespace: applicationNamespace,
                                                            serviceVersion: version,
-                                                           serviceInstanceId: Environment.MachineName);
+                                                           serviceInstanceId: instanceId,
+                                                           autoGenerateServiceInstanceId: false);
                             })
                             .AddOtlpExporter(opt =>
                             {
@@ -207,6 +212,13 @@ namespace CFX.OpenTelemetry
             }
 
             return otelSettings;
+        }
+
+        private static string GetInstanceId(IConfiguration configuration, string? key)
+        {
+            string machineName = Environment.MachineName;
+            string? instanceId = configuration.GetValueByKey(key);
+            return string.IsNullOrEmpty(instanceId) ? machineName : $"{machineName}.{instanceId}";
         }
 
         private static Sampler? GetSampler(IConfiguration configuration)
