@@ -78,6 +78,7 @@ namespace CFX.OpenTelemetry
             bool instrumentHttpClient = options.Instrumentation.HttpClientEnabled;
             bool instrumentAspNetCore = options.Instrumentation.AspNetCoreEnabled;
             bool instrumentRedis = options.Instrumentation.RedisEnabled;
+            bool instrumentTickerQ = options.Instrumentation.TickerQEnabled;
 
             AssemblyName? assemblyName = Assembly.GetEntryAssembly()?.GetName();
 
@@ -122,6 +123,10 @@ namespace CFX.OpenTelemetry
                         if (instrumentRedis)
                         {
                             builder.AddRedisInstrumentation();
+                        }
+                        if (instrumentTickerQ)
+                        {
+                            builder.AddSource("TickerQ");
                         }
                         builder.AddNpgsql()
                                .AddEntityFrameworkCoreInstrumentation()

@@ -50,5 +50,6 @@ namespace CFX.OpenTelemetry.Configuration
         public bool AspNetCoreEnabled { get; set; }
         public bool HttpClientEnabled { get; set; }
         public bool RedisEnabled { get; set; }
+        public bool TickerQEnabled { get; set; }
     }
 }
