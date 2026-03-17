@@ -51,5 +51,6 @@ namespace CFX.OpenTelemetry.Configuration
         public bool HttpClientEnabled { get; set; }
         public bool RedisEnabled { get; set; }
         public bool TickerQEnabled { get; set; }
+        public List<string> ActivitySources { get; set; } = [];
     }
 }

@@ -1,16 +1,17 @@
-﻿using System.Diagnostics.Metrics;
-using System.Reflection;
-using CFX.OpenTelemetry.Configuration;
+﻿using CFX.OpenTelemetry.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using OpenTelemetry.Exporter;
-using OpenTelemetry;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.Reflection;
 
 namespace CFX.OpenTelemetry
 {
@@ -70,10 +71,16 @@ namespace CFX.OpenTelemetry
                                                                      IConfiguration configuration,
                                                                      bool explicitLoggingRegistration = false,
                                                                      string? instanceIdKey = null,
-                                                                     Action<MeterProviderBuilder>? configureMeterProviderAction = null)
+                                                                     Action<MeterProviderBuilder>? configureMeterProviderAction = null,
+                                                                     params string[] additionalActivitySources)
         {
             ArgumentNullException.ThrowIfNull(configuration, nameof(configuration));
             OpenTelemetrySettings options = GetOpenTelemetrySettings(configuration);
+
+                IReadOnlyList<string> allActivitySources = options.Instrumentation.ActivitySources
+                  .Union(additionalActivitySources)
+                  .ToList();
+
 
             bool instrumentHttpClient = options.Instrumentation.HttpClientEnabled;
             bool instrumentAspNetCore = options.Instrumentation.AspNetCoreEnabled;
@@ -127,6 +134,10 @@ namespace CFX.OpenTelemetry
                         if (instrumentTickerQ)
                         {
                             builder.AddSource("TickerQ");
+                        }
+                        foreach (string source in allActivitySources)
+                        {
+                            builder.AddSource(source);
                         }
                         builder.AddNpgsql()
                                .AddEntityFrameworkCoreInstrumentation()
