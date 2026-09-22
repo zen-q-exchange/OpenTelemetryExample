@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <Version>1.0.4.3-rc.1</Version>
+    <Version>1.0.4.3</Version>
     <UserSecretsId>0a7b4187-9a82-4cf4-a4c6-69bee14ed67c</UserSecretsId>
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
